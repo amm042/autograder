@@ -17,6 +17,7 @@ class Client():
         self.connected = False
         self.activity = activity
         self.context = zmq.Context()
+        self.context.setsockopt(zmq.RCVTIMEO, 3 * 1000) # in milliseconds
         self.sessionid = None
         self.begin_session()
         
@@ -33,7 +34,7 @@ class Client():
         response = bson.BSON.decode(self.socket.recv())
         
         if 'status' in response and response['status'] == 'success':
-            self.sessionid = response.sessionid
+            self.sessionid = response['sessionid']
         elif 'message' in response:
             logging.info('Could not begin session: {}'.format(response['message']))
         
@@ -42,12 +43,41 @@ class Client():
             logging.info("Connecting to server at {}".format(self.remoteuri))                    
             self.socket = self.context.socket(zmq.REQ)            
             self.socket.connect (self.remoteuri)
-            
+            self.connected = True
+
+    def grade_file(self, filename):
+        req = {"type": "gradefile",
+               "sessionid": self.sessionid,
+               "filename": filename}
+        
+        logging.debug("sending grade request for {} on file {}".format(self.sessionid,
+                                                                       filename))
+        self.socket.send(bson.BSON.encode(req))
+        message = bson.BSON.decode(self.socket.recv())
+        if message['type'] == 'result':
+            logging.debug("  grading started for {} on file {}".format(self.sessionid,
+                                                                       filename))
+            return True
+        elif message['type'] == 'error':
+            logging.error("server error: {}".format(message['message']))
+        elif message['type'] == 'goodbye':
+            logging.error("server rejected us with a goodbye message")
+        return False
+    def check_result(self):
+        req = {'type': 'checkresult',
+               'sessionid': self.sessionid}
+        logging.debug("Checking status of {}".format(self.sessionid))
+        self.socket.send(bson.BSON.encode(req))
+        message = bson.BSON.decode(self.socket.recv())
+        logging.debug("Result was {}".format(message))
+        return message
+        
     def send_file(self, pathfilename):
         self.connect()
         logging.info("sending file: {}".format(pathfilename))
         
         req = {"type": "fileupload",
+               "sessionid": self.sessionid,
                "host": platform.node(),
                "user": pwd.getpwuid(os.getuid()),
                "filename": os.path.split(pathfilename)[-1],               
@@ -75,12 +105,13 @@ class Client():
                         
                         logging.info("sending chunk at {} ({}%)".format(
                             message['pos'],
-                            100 * float(message['pos']) / float(req['filesize'])))
+                            100 * float(message['pos'] + len(data)) / float(req['filesize'])))
                         if len(data) < message['size']:
                             logging.info( "  this is the last chunk")
                         
                         rsp = {'type': 'chunk',
                                'pos': message['pos'],
+                               'sessionid': self.sessionid,
                                'transno': message['transno'],
                                'size': len(data),
                                'data': data
@@ -120,9 +151,11 @@ def run():
                         required = True)
     parser.add_argument('-d', '--debug',
                         help = 'Debugging level: DEBUG, INFO, WARN, ERROR, CRITIAL',
-                        default = 'INFO')
+                        default = 'WARN')
     args = parser.parse_args()
     
+    levels =  ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']
+    assert args.debug in levels, "Debugging level not valid. Use one of: {}".format(levels)
     logging.getLogger().setLevel(args.debug)
     if not args.git and not args.file:
         logging.critical("Error, either -f FILE or -g GIT is required.")
@@ -136,8 +169,25 @@ def run():
         if args.git:
             logging.critical ("git grading not yet implemented.")
             exit(3)
+            
         if args.file:
             c.send_file(args.file)
+            
+            if c.grade_file(args.file):
+                count = 0
+                maxtries = 3
+                while count < maxtries:
+                    rslt = c.check_result()
+                    if rslt['returncode'] != None:
+                        break
+                    time.sleep(0.1)
+                    count += 1
+                if count >= maxtries:
+                    logging.error("Timed out waiting for result ({})".format(c.sessionid))
+                else:
+                    logging.info("got returncode {}".format(rslt['returncode']))
+            else:
+                logging.error("Grade file request failed.")
     except KeyboardInterrupt:
         logging.info('shutting down') 
         
