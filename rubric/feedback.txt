@@ -1,0 +1,16 @@
+  running: ./predict  static /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test1.outPassed 12.5/12.5 points for you
+Total Score: 12.5/100
+  running: ./predict  local 4 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test1.outPassed 12.5/12.5 points for you
+Total Score: 25.0/100
+  running: ./predict  two_level 8 2 4 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test1.outPassed 10/10 points for you
+Total Score: 35.0/100
+  running: ./predict  static /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test2.outPassed 12.5/12.5 points for you
+Total Score: 47.5/100
+  running: ./predict  local 16 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test2.outPassed 12.5/12.5 points for you
+Total Score: 60.0/100
+  running: ./predict  two_level 8 2 4 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test2.outPassed 10/10 points for you
+Total Score: 70.0/100
+  running: ./predict  two_level 16 4 128 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test2.outPassed 10/10 points for you
+Total Score: 80.0/100
+  running: ./predict  compete 32 /home/alan/Courses/csci320-F13/amm042_csci320/pin_branch/test2.outPassed 20/20 points for you
+Total Score: 100.0/100
